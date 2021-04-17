@@ -5,7 +5,7 @@
 #include <winternl.h>
 
 DWORD GetProcessIdByImageName(wchar_t* ProcessName);
-BOOL ProcessStealth(wchar_t TargetProcessName, wchar_t HideProcessName);
+BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName);
 
 #define STATUS_SUCCESS              ((NTSTATUS)0x00000000L)
 #define STATUS_INFO_LENGTH_MISMATCH ((NTSTATUS)0xC0000004L)

