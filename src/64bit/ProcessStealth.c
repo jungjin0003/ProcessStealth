@@ -129,7 +129,7 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
         return FALSE;
     }
 
-    printf("[*] Wrtie hide process name");
+    printf("[*] Wrtie hide process name\n");
 
     if (WriteProcessMemory(hProcess, (ULONGLONG)NewFunction + SearchOverwriteOffset(NewNtQuerySystemInformation), &SyscallClone, 8, &NumberOfBytesWritten) == FALSE)
     {
