@@ -1,6 +1,6 @@
 #include "ProcessStealth.h"
 
-DWORD GetProcessPID(wchar_t* ProcessName)
+DWORD GetProcessIdByImageName(wchar_t* ProcessName)
 {
     PSYSTEM_PROCESS_INFORMATION spi;
     DWORD PID = NULL;
@@ -49,4 +49,25 @@ DWORD GetProcessPID(wchar_t* ProcessName)
     VirtualFree(temp, 0, MEM_RELEASE);
 
     return PID;
+}
+
+BOOL ProcessStealth(wchar_t TargetProcessName, wchar_t HideProcessName)
+{
+    DWORD TargetPID = GetProcessIdByImageName(TargetProcessName);
+
+    HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, TargetPID);
+
+    if (hProcess == NULL)
+    {
+        printf("[-] OpenProcess Failed!\n");
+        printf("[*] GetLastError : %d\n", GetLastError());
+        return FALSE;
+    }
+
+
+}
+
+void HookFunction()
+{
+    
 }
