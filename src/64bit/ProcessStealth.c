@@ -222,18 +222,21 @@ NTSTATUS NTAPI NewNtQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInform
             }
 
             if (ret)
-                break;
+            {
+                if (pCur->NextEntryOffset == 0)
+                    pPrev->NextEntryOffset = 0;
+                else
+                    pPrev->NextEntryOffset += pCur->NextEntryOffset;
+            }
+            else
+                pPrev = pCur;
 
             if (pCur->NextEntryOffset == 0)
-                return ntstatus;
-            pPrev = pCur;
+                break;
+
             pCur = (ULONGLONG)pCur + pCur->NextEntryOffset;
         }
 
-        if (pCur->NextEntryOffset == 0)
-            pPrev->NextEntryOffset == 0;
-        else
-            pPrev->NextEntryOffset += pCur->NextEntryOffset;
         return ntstatus;
     }
 }
