@@ -225,8 +225,8 @@ NTSTATUS NTAPI NewNtQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInform
 
             for (int i = 0; (*(HideProcessName + i) != NULL) && (*(pCur->ImageName.Buffer + i) != NULL); i++)
             {
-                s1 = Upper(*(HideProcessName + i));
-                s2 = Upper(*(pCur->ImageName.Buffer + i));
+                s1 = Lower(*(HideProcessName + i));
+                s2 = Lower(*(pCur->ImageName.Buffer + i));
                 ret = (s1 == s2) ? TRUE : FALSE;
                 if (ret == FALSE)
                     break;
